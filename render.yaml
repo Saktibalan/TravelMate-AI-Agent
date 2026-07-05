@@ -1,0 +1,67 @@
+# ============================================================
+# Render Blueprint — Infrastructure as Code
+# Deploy: Push to GitHub, then connect repo at https://render.com
+# Or use "New > Blueprint" and point to this file.
+# ============================================================
+
+services:
+  # ---- FastAPI Backend ----
+  - type: web
+    name: travelmate-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: travelmate-db
+          property: connectionString
+      - key: FRONTEND_URL
+        value: https://travelmate-frontend.onrender.com
+      - key: ENV
+        value: production
+      - key: CHROMA_PERSIST_DIR
+        value: /app/chroma_store
+      # Add your API keys via the Render dashboard (Settings > Environment)
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: AMADEUS_API_KEY
+        sync: false
+      - key: AMADEUS_API_SECRET
+        sync: false
+      - key: GOOGLE_PLACES_API_KEY
+        sync: false
+      - key: OPENWEATHER_API_KEY
+        sync: false
+      - key: BOOKING_API_KEY
+        sync: false
+    healthCheckPath: /health
+
+  # ---- React Frontend (Static Site) ----
+  - type: web
+    name: travelmate-frontend
+    runtime: static
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: ./frontend/dist
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE
+        value: https://travelmate-backend.onrender.com
+
+databases:
+  - name: travelmate-db
+    plan: free
+    databaseName: travelmate
+    user: travelmate
+    ipAllowList: []

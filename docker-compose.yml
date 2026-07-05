@@ -1,0 +1,68 @@
+# ============================================================
+# TravelMate AI — Docker Compose (local production testing)
+# Usage:  docker compose up --build
+# ============================================================
+
+services:
+  # ---- PostgreSQL Database ----
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: travelmate
+      POSTGRES_PASSWORD: travelmate_secret
+      POSTGRES_DB: travelmate
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U travelmate"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ---- FastAPI Backend ----
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://travelmate:travelmate_secret@postgres:5432/travelmate
+      - CHROMA_PERSIST_DIR=/app/chroma_store
+      - FRONTEND_URL=http://localhost
+      - ENV=production
+      # Pass through optional API keys from host .env
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-claude-sonnet-4-6}
+      - AMADEUS_API_KEY=${AMADEUS_API_KEY:-}
+      - AMADEUS_API_SECRET=${AMADEUS_API_SECRET:-}
+      - GOOGLE_PLACES_API_KEY=${GOOGLE_PLACES_API_KEY:-}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY:-}
+      - BOOKING_API_KEY=${BOOKING_API_KEY:-}
+    volumes:
+      - chroma_data:/app/chroma_store
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ---- React Frontend (Nginx) ----
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: http://localhost:8000
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  chroma_data:
