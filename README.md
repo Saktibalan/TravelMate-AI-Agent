@@ -3,6 +3,8 @@
 An agentic AI system that plans complete trips (flights, hotels, day-by-day
 itinerary, and budget tracking) using a multi-agent pipeline orchestrated
 with LangGraph.
+DEMO LINK : 
+https://amazing-churros-516a77.netlify.app/
 
 ## Architecture
 
